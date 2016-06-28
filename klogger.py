@@ -13,8 +13,11 @@ WARNING = 1
 ERROR = 0
 __VERBOSITY = 3
 __SYNC_PRINT_LOCK = threading.Lock()
+__REGISTER_LOCK = threading.Lock()
+__THREAD_INDEX = 0
 __THREADS = {}
-__THREADS_STACK_DEPTH = {}
+__THREAD_STACK_DEPTH = {}
+__THREAD_PARAMS = {}
 
 def __get_path_info():
     for item in inspect.stack():
@@ -34,6 +37,11 @@ def __get_path_info():
 #
 #     return word + 'ing'
 
+def __merge_dicts(a, b):
+    a = a.copy()
+    a.update(b)
+    return a
+
 def __get_log_type_string(t):
     if t == INFO:
         return "I"
@@ -51,18 +59,16 @@ def __sync_print(a, *args, **kwargs):
         a = str(a) + "\n"
         sys.stdout.write(a, *args, **kwargs)
 
+def __init_thread_info(thread):
+    global __THREAD_INDEX
+
+    __THREADS[thread] = __THREAD_INDEX
+    __THREAD_STACK_DEPTH[thread] = 0
+    __THREAD_PARAMS[thread] = {}
+    __THREAD_INDEX += 1
+
 def __get_current_thread_id():
-    if not hasattr(__get_current_thread_id, "index"):
-        setattr(__get_current_thread_id, "index", 0)
-
-    cur_index = getattr(__get_current_thread_id, "index", 0)
-    cur_thread = threading.current_thread()
-    if cur_thread not in __THREADS:
-        __THREADS[cur_thread] = cur_index
-        __THREADS_STACK_DEPTH[cur_thread] = 0
-        setattr(__get_current_thread_id, "index", cur_index + 1)
-
-    return __THREADS[cur_thread]
+    return __THREADS[threading.current_thread()]
 
 def __get_current_thread_type_string():
     cur_thread = threading.current_thread()
@@ -77,35 +83,36 @@ def __get_current_thread_type_string():
 def __get_current_thread_depth():
     cur_thread = threading.current_thread
 
-    if cur_thread not in __THREADS_STACK_DEPTH:
+    if cur_thread not in __THREAD_STACK_DEPTH:
         return 0
 
-    return __THREADS_STACK_DEPTH[cur_thread]
+    return __THREAD_STACK_DEPTH[cur_thread]
 
 def __get_current_thread_depth_string():
     depth = __get_current_thread_depth()
     return "d{:02d}".format(depth)
 
 def __get_current_thread_indent_string():
-    depth = __get_current_thread_depth()
-    return " " * 2 * depth
+    #depth = __get_current_thread_depth()
+    #return " " * 2 * depth
+    return ""
 
 def __increase_current_thread_depth():
     cur_thread = threading.current_thread
 
-    if cur_thread not in __THREADS_STACK_DEPTH:
-        __THREADS_STACK_DEPTH[cur_thread] = 0
+    if cur_thread not in __THREAD_STACK_DEPTH:
+        __THREAD_STACK_DEPTH[cur_thread] = 0
 
-    __THREADS_STACK_DEPTH[cur_thread] += 1
+    __THREAD_STACK_DEPTH[cur_thread] += 1
 
 def __decrease_current_thread_depth():
     cur_thread = threading.current_thread
 
-    if cur_thread not in __THREADS_STACK_DEPTH:
-        __THREADS_STACK_DEPTH[cur_thread] = 0
+    if cur_thread not in __THREAD_STACK_DEPTH:
+        __THREAD_STACK_DEPTH[cur_thread] = 0
 
-    __THREADS_STACK_DEPTH[cur_thread] -= 1
-    __THREADS_STACK_DEPTH[cur_thread] = max(0, __THREADS_STACK_DEPTH[cur_thread])
+    __THREAD_STACK_DEPTH[cur_thread] -= 1
+    __THREAD_STACK_DEPTH[cur_thread] = max(0, __THREAD_STACK_DEPTH[cur_thread])
 
 def __get_prefix(t):
     timestamp = datetime.now().isoformat()
@@ -115,6 +122,12 @@ def __get_prefix(t):
     indent_str = __get_current_thread_indent_string()
 
     return "{0} [{3}] ({1}|{2}) {4}".format(type_str, t_str, depth_str, timestamp, indent_str)
+
+def __register_thread():
+    with __REGISTER_LOCK:
+        cur_thread = threading.current_thread()
+        if cur_thread not in __THREADS:
+            __init_thread_info(cur_thread)
 
 # def decorate_jobname(jobname):
 #     """
@@ -135,34 +148,47 @@ def __get_prefix(t):
 #
 #     return " ".join(words)
 
-def log(jobName, func, t, *args, **kwargs):
-    file = __get_path_info()
+def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
+
+    init_progress = kwargs.pop("init_progress", False)
+    max_value = kwargs.pop("max_value", 100)
+
+    __register_thread()
+    thread = threading.current_thread()
     prefix = __get_prefix(t)
-    __increase_current_thread_depth()
 
-    if t <= __VERBOSITY:
-        slog = "{}Now working on '{}'...".format(prefix, jobName)
+    if init_progress:
+        __THREAD_PARAMS[thread]["max_value"] = max_value
+        __THREAD_PARAMS[thread]["progress"] = 0
+
+    if not func:
+        slog = prefix + x
         __sync_print(slog)
+    else:
+        __increase_current_thread_depth()
+        if t <= __VERBOSITY:
+            slog = "{}Now working on '{}'...".format(prefix, x)
+            __sync_print(slog)
 
-    # if (to_file):
-    #     with open("{}.log".format(file), "w+") as f:
-    #         f.write("[{}] In {}: {}\n".format(datetime.now(), file, slog))
+        # if (to_file):
+        #     with open("{}.log".format(file), "w+") as f:
+        #         f.write("[{}] In {}: {}\n".format(datetime.now(), file, slog))
 
-    t1 = time.time()
-    r = func(*args, **kwargs)
-    t2 = time.time()
+        t1 = time.time()
+        r = func(*fargs, **fkwargs)
+        t2 = time.time()
 
-    if t <= __VERBOSITY:
-        elog = "{}'{}' finished in {:.3f}s.".format(prefix, jobName, t2 - t1)
-        __sync_print(elog)
+        if t <= __VERBOSITY:
+            elog = "{}'{}' finished in {:.3f}s.".format(prefix, x, t2 - t1)
+            __sync_print(elog)
 
-    # if (to_file):
-    #     with open("{}.log".format(file), "a") as f:
-    #         f.write("[{}] In {}: {}\n".format(datetime.now(), file, elog))
+        # if (to_file):
+        #     with open("{}.log".format(file), "a") as f:
+        #         f.write("[{}] In {}: {}\n".format(datetime.now(), file, elog))
 
 
-    __decrease_current_thread_depth()
-    return r
+        __decrease_current_thread_depth()
+        return r
 
 # def parseFunctionName(name):
 #     if _UNDERSCORE_REGEX.findall(name):
@@ -177,24 +203,46 @@ def log(jobName, func, t, *args, **kwargs):
 def task(name=None, t=INFO, *args, **kwargs):
     """
     This decorator modifies current function such that its start, end, and
-    duration is logged in console. If task name is not given, it will attempt to
+    duration is logged in console. If the task name is not given, it will attempt to
     infer it from the function name. Optionally, the decorator can log
     information into files.
     """
+
+    def run(*largs, **lkwargs):
+        return
+
     if callable(name):
         f = name
         name = f.__name__
 
-        return lambda *args, **kwargs: log(name, f, t, *args, **kwargs)
+        return lambda *largs, **lkwargs: log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
 
     if name == None:
         def wrapped(f):
             name = f.__name__
-            return lambda *args, **kwargs: log(name, f, t, *args, **kwargs)
+            return lambda *largs, **lkwargs: log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
 
         return wrapped
     else:
-        return lambda f: lambda *args, **kwargs: log(name, f, t, *args, **kwargs)
+        return lambda f: lambda *largs, **lkwargs: log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
+
+def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
+    """
+    This decorator extends the basic @task decorator by allowing users to
+    display some form of progress on the console. The module can receive
+    an increment in the progress through "tick_progress".
+    """
+    return task(name=name, t=t, init_progress=True, max_value=max_value, *args, **kwargs)
+
+def tick_progress(amount=1, msg=None):
+    cur_thread = threading.current_thread()
+    __THREAD_PARAMS[cur_thread]["progress"] += amount
+    prefix = __get_prefix(INFO)
+    progress = __THREAD_PARAMS[cur_thread]["progress"]
+    max_value = __THREAD_PARAMS[cur_thread]["max_value"]
+
+    slog = prefix + ("" if msg == None else msg + " ") + "{}/{} ({}%)".format(progress, max_value, float(progress) / max_value * 100)
+    __sync_print(slog)
 
 def info(name=None, *args, **kwargs):
     return task(name, INFO, *args, **kwargs)
