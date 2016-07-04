@@ -12,12 +12,14 @@ DEBUG = 2
 WARNING = 1
 ERROR = 0
 __VERBOSITY = 3
+__FUNC_NAME_LENGTH = 5
 __SYNC_PRINT_LOCK = threading.Lock()
 __REGISTER_LOCK = threading.Lock()
 __THREAD_INDEX = 0
 __THREADS = {}
 __THREAD_STACK_DEPTH = {}
 __THREAD_PARAMS = {}
+__THREAD_PARAMS_FNAME_KEY = "func_name"
 
 def __get_path_info():
     for item in inspect.stack():
@@ -66,12 +68,21 @@ def __init_thread_info(thread):
     __THREAD_STACK_DEPTH[thread] = 0
     __THREAD_PARAMS[thread] = {}
     __THREAD_INDEX += 1
+    __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY] = ""
+
+def __get_current_thread():
+    t = threading.current_thread()
+
+    if t not in __THREADS:
+        __register_thread()
+
+    return t
 
 def __get_current_thread_id():
-    return __THREADS[threading.current_thread()]
+    return __THREADS[__get_current_thread()]
 
 def __get_current_thread_type_string():
-    cur_thread = threading.current_thread()
+    cur_thread = __get_current_thread()
     is_main = isinstance(cur_thread, threading._MainThread)
 
     if is_main:
@@ -114,14 +125,26 @@ def __decrease_current_thread_depth():
     __THREAD_STACK_DEPTH[cur_thread] -= 1
     __THREAD_STACK_DEPTH[cur_thread] = max(0, __THREAD_STACK_DEPTH[cur_thread])
 
+def __get_current_thread_fname():
+    thread = __get_current_thread()
+    name = __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY]
+
+    if len(name) > __FUNC_NAME_LENGTH + 2:
+        name = name[:__FUNC_NAME_LENGTH] + ".."
+
+    #name = "{{:{}s}}".format(__FUNC_NAME_LENGTH + 2).format(name)
+
+    return name
+
 def __get_prefix(t):
     timestamp = datetime.now().isoformat()
     type_str = __get_log_type_string(t)
     t_str = __get_current_thread_type_string()
     depth_str = __get_current_thread_depth_string()
     indent_str = __get_current_thread_indent_string()
+    fname_str = __get_current_thread_fname()
 
-    return "{0} [{3}] ({1}|{2}) {4}".format(type_str, t_str, depth_str, timestamp, indent_str)
+    return "{0} [{3}] ({1}|{2}) <{5}> {4}".format(type_str, t_str, depth_str, timestamp, indent_str, fname_str)
 
 def __register_thread():
     with __REGISTER_LOCK:
@@ -153,8 +176,7 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
     init_progress = kwargs.pop("init_progress", False)
     max_value = kwargs.pop("max_value", 100)
 
-    __register_thread()
-    thread = threading.current_thread()
+    thread = __get_current_thread()
     prefix = __get_prefix(t)
 
     if init_progress:
@@ -208,23 +230,34 @@ def task(name=None, t=INFO, *args, **kwargs):
     information into files.
     """
 
-    def run(*largs, **lkwargs):
-        return
+    def c_run(name, f, t, args, kwargs):
+        def run(*largs, **lkwargs):
+            thread = __get_current_thread()
+            old_name = __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY]
+            __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY] = name
+
+            r = log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
+
+            __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY] = old_name
+            return r
+
+        return run
 
     if callable(name):
         f = name
         name = f.__name__
 
-        return lambda *largs, **lkwargs: log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
+        return c_run(name, f, t, args, kwargs)
 
     if name == None:
         def wrapped(f):
             name = f.__name__
-            return lambda *largs, **lkwargs: log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
+
+            return c_run(name, f, t, args, kwargs)
 
         return wrapped
     else:
-        return lambda f: lambda *largs, **lkwargs: log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
+        return c_run(name, None, t, args, kwargs)
 
 def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
     """
@@ -235,7 +268,7 @@ def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
     return task(name=name, t=t, init_progress=True, max_value=max_value, *args, **kwargs)
 
 def tick_progress(amount=1, msg=None):
-    cur_thread = threading.current_thread()
+    cur_thread = __get_current_thread()
     __THREAD_PARAMS[cur_thread]["progress"] += amount
     prefix = __get_prefix(INFO)
     progress = __THREAD_PARAMS[cur_thread]["progress"]
