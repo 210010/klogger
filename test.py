@@ -43,4 +43,5 @@ def main():
 
 if __name__ == "__main__":
     klogger.set_verbosity(klogger.DEBUG)
+    log(3)
     main()

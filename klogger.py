@@ -184,7 +184,7 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
         __THREAD_PARAMS[thread]["progress"] = 0
 
     if not func:
-        slog = prefix + x
+        slog = prefix + str(x)
         __sync_print(slog)
     else:
         __increase_current_thread_depth()
