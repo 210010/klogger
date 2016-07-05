@@ -8,12 +8,16 @@ def foo(n):
     if n < 0:
         return
 
-    foo(n - 1)
+    foo2(foo, n - 1)
+
+@info
+def foo2(f, *args):
+    return f(*args)
 
 @progress_task(max_value=10)
 def bar():
     for i in range(10):
-        tick_progress(amount=3)
+        tick_progress(amount=1)
         time.sleep(0.1)
 
 def test_recursion():
@@ -23,7 +27,7 @@ def test_recursion():
 
     r = []
     for i in range(10):
-        r.append(pool.apply_async(foo, args=(i, )))
+        r.append(pool.apply_async(foo2, args=(foo, i, )))
 
     for a in r:
         a.get()
@@ -39,9 +43,10 @@ def test_progress():
         a.get()
 
 def main():
+    test_recursion()
     test_progress()
 
 if __name__ == "__main__":
-    klogger.set_verbosity(klogger.DEBUG)
+    klogger.set_verbosity(klogger.INFO)
     log(3)
     main()

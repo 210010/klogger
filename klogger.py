@@ -15,6 +15,7 @@ __VERBOSITY = 3
 __FUNC_NAME_LENGTH = 5
 __SYNC_PRINT_LOCK = threading.Lock()
 __REGISTER_LOCK = threading.Lock()
+
 __THREAD_INDEX = 0
 __THREADS = {}
 __THREAD_STACK_DEPTH = {}
@@ -92,7 +93,7 @@ def __get_current_thread_type_string():
         return "t{:03d}".format(thread_idx)
 
 def __get_current_thread_depth():
-    cur_thread = threading.current_thread
+    cur_thread = __get_current_thread()
 
     if cur_thread not in __THREAD_STACK_DEPTH:
         return 0
@@ -109,7 +110,7 @@ def __get_current_thread_indent_string():
     return ""
 
 def __increase_current_thread_depth():
-    cur_thread = threading.current_thread
+    cur_thread = __get_current_thread()
 
     if cur_thread not in __THREAD_STACK_DEPTH:
         __THREAD_STACK_DEPTH[cur_thread] = 0
@@ -117,7 +118,7 @@ def __increase_current_thread_depth():
     __THREAD_STACK_DEPTH[cur_thread] += 1
 
 def __decrease_current_thread_depth():
-    cur_thread = threading.current_thread
+    cur_thread = __get_current_thread()
 
     if cur_thread not in __THREAD_STACK_DEPTH:
         __THREAD_STACK_DEPTH[cur_thread] = 0
@@ -236,7 +237,7 @@ def task(name=None, t=INFO, *args, **kwargs):
             old_name = __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY]
             __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY] = name
 
-            r = log(name, f, t, *(args + largs), **__merge_dicts(lkwargs, kwargs))
+            r = log(name, f, t, largs, lkwargs, *args, **kwargs)
 
             __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY] = old_name
             return r
@@ -269,10 +270,13 @@ def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
 
 def tick_progress(amount=1, msg=None):
     cur_thread = __get_current_thread()
-    __THREAD_PARAMS[cur_thread]["progress"] += amount
     prefix = __get_prefix(INFO)
     progress = __THREAD_PARAMS[cur_thread]["progress"]
     max_value = __THREAD_PARAMS[cur_thread]["max_value"]
+
+    __THREAD_PARAMS[cur_thread]["progress"] += amount
+    progress += amount
+    __THREAD_PARAMS[cur_thread]["progress"] = min(max_value, __THREAD_PARAMS[cur_thread]["progress"])
 
     slog = prefix + ("" if msg == None else msg + " ") + "{}/{} ({}%)".format(progress, max_value, float(progress) / max_value * 100)
     __sync_print(slog)
