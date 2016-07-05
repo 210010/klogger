@@ -178,19 +178,19 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
     max_value = kwargs.pop("max_value", 100)
 
     thread = __get_current_thread()
-    prefix = __get_prefix(t)
 
     if init_progress:
         __THREAD_PARAMS[thread]["max_value"] = max_value
         __THREAD_PARAMS[thread]["progress"] = 0
 
     if not func:
-        slog = prefix + str(x)
+        slog = __get_prefix(t) + str(x)
         __sync_print(slog)
     else:
         __increase_current_thread_depth()
+
         if t <= __VERBOSITY:
-            slog = "{}Now working on '{}'...".format(prefix, x)
+            slog = "{}Now working on '{}'...".format(__get_prefix(t), x)
             __sync_print(slog)
 
         # if (to_file):
@@ -202,7 +202,7 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
         t2 = time.time()
 
         if t <= __VERBOSITY:
-            elog = "{}'{}' finished in {:.3f}s.".format(prefix, x, t2 - t1)
+            elog = "{}'{}' finished in {:.3f}s.".format(__get_prefix(t), x, t2 - t1)
             __sync_print(elog)
 
         # if (to_file):
