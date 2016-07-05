@@ -253,12 +253,11 @@ def task(name=None, t=INFO, *args, **kwargs):
     if name == None:
         def wrapped(f):
             name = f.__name__
-
             return c_run(name, f, t, args, kwargs)
 
         return wrapped
     else:
-        return c_run(name, None, t, args, kwargs)
+        return lambda f: c_run(name, f, t, args, kwargs)
 
 def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
     """
