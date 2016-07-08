@@ -11,6 +11,8 @@ INFO = 3
 DEBUG = 2
 WARNING = 1
 ERROR = 0
+__SAVE_TO_FILE = False
+__LOG_FILENAME = ""
 __VERBOSITY = 3
 __FUNC_NAME_LENGTH = 5
 __SYNC_PRINT_LOCK = threading.Lock()
@@ -58,9 +60,15 @@ def __get_log_type_string(t):
     return None
 
 def __sync_print(a, *args, **kwargs):
+    global __SAVE_TO_FILE, __LOG_FILENAME
+
     with __SYNC_PRINT_LOCK:
         a = str(a) + "\n"
         sys.stdout.write(a, *args, **kwargs)
+
+        if __SAVE_TO_FILE:
+            with open(__LOG_FILENAME, "a") as f:
+                f.write(a)
 
 def __init_thread_info(thread):
     global __THREAD_INDEX
@@ -289,3 +297,14 @@ def debug(name=None, *args, **kwargs):
 def set_verbosity(level):
     global __VERBOSITY
     __VERBOSITY = level
+
+def set_log_to_file(filename):
+    global __SAVE_TO_FILE, __LOG_FILENAME
+
+    __SAVE_TO_FILE = True
+    __LOG_FILENAME = filename
+
+def unset_log_to_file():
+    global __SAVE_TO_FILE, __LOG_FILENAME
+
+    __SAVE_TO_FILE = False

@@ -1,4 +1,4 @@
-from klogger import task, debug, info, log, progress_task, tick_progress
+from klogger import task, debug, info, log, progress_task, tick_progress, set_log_to_file
 import klogger
 from multiprocessing.pool import ThreadPool
 import time
@@ -48,5 +48,6 @@ def main():
 
 if __name__ == "__main__":
     klogger.set_verbosity(klogger.INFO)
+    set_log_to_file("test.log")
     log(3)
     main()
