@@ -190,6 +190,7 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
     if init_progress:
         __THREAD_PARAMS[thread]["max_value"] = max_value
         __THREAD_PARAMS[thread]["progress"] = 0
+        __THREAD_PARAMS[thread]["initial_time"] = time.time()
 
     if not func:
         slog = __get_prefix(t) + str(x)
@@ -285,7 +286,10 @@ def tick_progress(amount=1, msg=None):
     progress += amount
     __THREAD_PARAMS[cur_thread]["progress"] = min(max_value, __THREAD_PARAMS[cur_thread]["progress"])
 
-    slog = prefix + ("" if msg == None else msg + " ") + "{}/{} ({}%)".format(progress, max_value, float(progress) / max_value * 100)
+    dt = time.time() - __THREAD_PARAMS[cur_thread]["initial_time"]
+
+    est = float(max_value) / float(progress) * dt
+    slog = prefix + ("" if msg == None else msg + " ") + "{}/{} ({}%), est. finish time: {:.3f} s".format(progress, max_value, float(progress) / max_value * 100, est)
     __sync_print(slog)
 
 def info(name=None, *args, **kwargs):
