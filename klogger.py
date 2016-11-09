@@ -66,6 +66,11 @@ def __get_log_type_string(t):
 def __sync_print(a, *args, **kwargs):
     global __SAVE_TO_FILE, __LOG_FILENAME
 
+    t = kwargs.pop("t", INFO)
+
+    if t > __VERBOSITY:
+        return
+
     with __SYNC_PRINT_LOCK:
         a = str(a) + "\n"
         sys.stdout.write(a, *args, **kwargs)
@@ -198,13 +203,12 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
 
     if not func:
         slog = __get_prefix(t) + str(x)
-        __sync_print(slog)
+        __sync_print(slog, t=t)
     else:
         __increase_current_thread_depth()
 
-        if t <= __VERBOSITY:
-            slog = "{}Now working on '{}'...".format(__get_prefix(t), x)
-            __sync_print(slog)
+        slog = "{}Now working on '{}'...".format(__get_prefix(t), x)
+        __sync_print(slog, t=t)
 
         # if (to_file):
         #     with open("{}.log".format(file), "w+") as f:
@@ -214,9 +218,8 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
         r = func(*fargs, **fkwargs)
         t2 = time.time()
 
-        if t <= __VERBOSITY:
-            elog = "{}'{}' finished in {:.3f}s.".format(__get_prefix(t), x, t2 - t1)
-            __sync_print(elog)
+        elog = "{}'{}' finished in {:.3f}s.".format(__get_prefix(t), x, t2 - t1)
+        __sync_print(elog, t=t)
 
         # if (to_file):
         #     with open("{}.log".format(file), "a") as f:
@@ -280,7 +283,7 @@ def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
     """
     return task(name=name, t=t, init_progress=True, max_value=max_value, *args, **kwargs)
 
-def tick_progress(amount=1, msg=None):
+def tick_progress(amount=1, msg=None, t=INFO):
     cur_thread = __get_current_thread()
     prefix = __get_prefix(INFO)
     progress = __THREAD_PARAMS[cur_thread]["progress"]
@@ -293,8 +296,9 @@ def tick_progress(amount=1, msg=None):
     dt = time.time() - __THREAD_PARAMS[cur_thread]["initial_time"]
 
     est = float(max_value) / float(progress) * dt
+
     slog = prefix + ("" if msg == None else msg + " ") + "{}/{} ({}%), est. finish time: {:.3f} s".format(progress, max_value, float(progress) / max_value * 100, est)
-    __sync_print(slog)
+    __sync_print(slog, t=t)
 
 def info(name=None, *args, **kwargs):
     return task(name, INFO, *args, **kwargs)

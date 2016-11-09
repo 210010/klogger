@@ -47,7 +47,7 @@ def main():
     test_progress()
 
 if __name__ == "__main__":
-    klogger.set_verbosity(klogger.INFO)
+    klogger.set_verbosity(klogger.ERROR)
     set_log_to_file("test.log")
     log(3)
     main()
