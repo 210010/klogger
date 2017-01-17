@@ -1,4 +1,4 @@
-#encoding: UTF-8
+# encoding: UTF-8
 
 from __future__ import unicode_literals
 
@@ -28,12 +28,14 @@ __THREAD_STACK_DEPTH = {}
 __THREAD_PARAMS = {}
 __THREAD_PARAMS_FNAME_KEY = "func_name"
 
+
 def __get_path_info():
     for item in inspect.stack():
         if item and __file__ not in item:
             return item[1]
 
     return __file__
+
 
 # def add_ing(word):
 #     assert type(word) == str and len(word) > 0
@@ -51,6 +53,7 @@ def __merge_dicts(a, b):
     a.update(b)
     return a
 
+
 def __get_log_type_string(t):
     if t == INFO:
         return "I"
@@ -62,6 +65,7 @@ def __get_log_type_string(t):
         return "E"
 
     return None
+
 
 def __sync_print(a, *args, **kwargs):
     global __SAVE_TO_FILE, __LOG_FILENAME
@@ -79,6 +83,7 @@ def __sync_print(a, *args, **kwargs):
             with open(__LOG_FILENAME, "a") as f:
                 f.write(a)
 
+
 def __init_thread_info(thread):
     global __THREAD_INDEX
 
@@ -88,6 +93,7 @@ def __init_thread_info(thread):
     __THREAD_INDEX += 1
     __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY] = ""
 
+
 def __get_current_thread():
     t = threading.current_thread()
 
@@ -96,8 +102,10 @@ def __get_current_thread():
 
     return t
 
+
 def __get_current_thread_id():
     return __THREADS[__get_current_thread()]
+
 
 def __get_current_thread_type_string():
     cur_thread = __get_current_thread()
@@ -109,6 +117,7 @@ def __get_current_thread_type_string():
         thread_idx = __get_current_thread_id()
         return "t{:03d}".format(thread_idx)
 
+
 def __get_current_thread_depth():
     cur_thread = __get_current_thread()
 
@@ -117,14 +126,17 @@ def __get_current_thread_depth():
 
     return __THREAD_STACK_DEPTH[cur_thread]
 
+
 def __get_current_thread_depth_string():
     depth = __get_current_thread_depth()
     return "d{:02d}".format(depth)
 
+
 def __get_current_thread_indent_string():
-    #depth = __get_current_thread_depth()
-    #return " " * 2 * depth
+    # depth = __get_current_thread_depth()
+    # return " " * 2 * depth
     return ""
+
 
 def __increase_current_thread_depth():
     cur_thread = __get_current_thread()
@@ -133,6 +145,7 @@ def __increase_current_thread_depth():
         __THREAD_STACK_DEPTH[cur_thread] = 0
 
     __THREAD_STACK_DEPTH[cur_thread] += 1
+
 
 def __decrease_current_thread_depth():
     cur_thread = __get_current_thread()
@@ -143,6 +156,7 @@ def __decrease_current_thread_depth():
     __THREAD_STACK_DEPTH[cur_thread] -= 1
     __THREAD_STACK_DEPTH[cur_thread] = max(0, __THREAD_STACK_DEPTH[cur_thread])
 
+
 def __get_current_thread_fname():
     thread = __get_current_thread()
     name = __THREAD_PARAMS[thread][__THREAD_PARAMS_FNAME_KEY]
@@ -150,9 +164,10 @@ def __get_current_thread_fname():
     if len(name) > __FUNC_NAME_LENGTH + 2:
         name = name[:__FUNC_NAME_LENGTH] + ".."
 
-    #name = "{{:{}s}}".format(__FUNC_NAME_LENGTH + 2).format(name)
+    # name = "{{:{}s}}".format(__FUNC_NAME_LENGTH + 2).format(name)
 
     return name
+
 
 def __get_prefix(t):
     timestamp = datetime.now().isoformat()
@@ -162,13 +177,17 @@ def __get_prefix(t):
     indent_str = __get_current_thread_indent_string()
     fname_str = __get_current_thread_fname()
 
-    return "{0} [{3}] ({1}|{2}) <{5}> {4}".format(type_str, t_str, depth_str, timestamp, indent_str, fname_str)
+    return "{0} [{3}] ({1}|{2}) <{5}> {4}".format(type_str, t_str, depth_str,
+                                                  timestamp, indent_str,
+                                                  fname_str)
+
 
 def __register_thread():
     with __REGISTER_LOCK:
         cur_thread = threading.current_thread()
         if cur_thread not in __THREADS:
             __init_thread_info(cur_thread)
+
 
 # def decorate_jobname(jobname):
 #     """
@@ -190,7 +209,6 @@ def __register_thread():
 #     return " ".join(words)
 
 def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
-
     init_progress = kwargs.pop("init_progress", False)
     max_value = kwargs.pop("max_value", 100)
 
@@ -218,16 +236,17 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
         r = func(*fargs, **fkwargs)
         t2 = time.time()
 
-        elog = "{}'{}' finished in {:.3f}s.".format(__get_prefix(t), x, t2 - t1)
+        elog = "{}'{}' finished in {:.3f}s.".format(__get_prefix(t), x,
+                                                    t2 - t1)
         __sync_print(elog, t=t)
 
         # if (to_file):
         #     with open("{}.log".format(file), "a") as f:
         #         f.write("[{}] In {}: {}\n".format(datetime.now(), file, elog))
 
-
         __decrease_current_thread_depth()
         return r
+
 
 # def parseFunctionName(name):
 #     if _UNDERSCORE_REGEX.findall(name):
@@ -242,9 +261,9 @@ def log(x, func=None, t=INFO, fargs=(), fkwargs={}, *args, **kwargs):
 def task(name=None, t=INFO, *args, **kwargs):
     """
     This decorator modifies current function such that its start, end, and
-    duration is logged in console. If the task name is not given, it will attempt to
-    infer it from the function name. Optionally, the decorator can log
-    information into files.
+    duration is logged in console. If the task name is not given, it will
+    attempt to infer it from the function name. Optionally, the decorator
+    can log information into files.
     """
 
     def c_run(name, f, t, args, kwargs):
@@ -275,13 +294,16 @@ def task(name=None, t=INFO, *args, **kwargs):
     else:
         return lambda f: c_run(name, f, t, args, kwargs)
 
+
 def progress_task(name=None, t=INFO, max_value=100, *args, **kwargs):
     """
     This decorator extends the basic @task decorator by allowing users to
     display some form of progress on the console. The module can receive
     an increment in the progress through "tick_progress".
     """
-    return task(name=name, t=t, init_progress=True, max_value=max_value, *args, **kwargs)
+    return task(name=name, t=t, init_progress=True, max_value=max_value,
+                *args, **kwargs)
+
 
 def tick_progress(amount=1, msg=None, t=INFO):
     cur_thread = __get_current_thread()
@@ -291,32 +313,55 @@ def tick_progress(amount=1, msg=None, t=INFO):
 
     __THREAD_PARAMS[cur_thread]["progress"] += amount
     progress += amount
-    __THREAD_PARAMS[cur_thread]["progress"] = min(max_value, __THREAD_PARAMS[cur_thread]["progress"])
+    __THREAD_PARAMS[cur_thread]["progress"] = min(max_value,
+                                                  __THREAD_PARAMS[cur_thread][
+                                                      "progress"])
 
     dt = time.time() - __THREAD_PARAMS[cur_thread]["initial_time"]
 
-    est = float(max_value) / float(progress) * dt
+    pcn = float(progress) / max_value * 100
+    est_total_time = float(max_value) / float(progress) * dt
+    est_remaining_time = est_total_time - dt
+    space = "" if msg == None else msg + " "
 
-    slog = prefix + ("" if msg == None else msg + " ") + "{}/{} ({}%), est. finish time: {:.3f} s".format(progress, max_value, float(progress) / max_value * 100, est)
+    tick_log = "{}/{} ({}%), est. total: {:.3f} s, " \
+               "remaining: {:.3f} s".format(progress,
+                                            max_value, pcn,
+                                            est_total_time,
+                                            est_remaining_time)
+    slog = prefix + space + tick_log
     __sync_print(slog, t=t)
+
 
 def info(name=None, *args, **kwargs):
     return task(name, INFO, *args, **kwargs)
 
+
 def debug(name=None, *args, **kwargs):
     return task(name, DEBUG, *args, **kwargs)
+
+
+def warning(name=None, *args, **kwargs):
+    return task(name, WARNING, *args, **kwargs)
+
+
+def error(name=None, *args, **kwargs):
+    return task(name, ERROR, *args, **kwargs)
+
 
 def set_verbosity(level):
     global __VERBOSITY
     __VERBOSITY = level
 
-def set_log_to_file(filename):
+
+def set_log_path(filename):
     global __SAVE_TO_FILE, __LOG_FILENAME
 
     __SAVE_TO_FILE = True
     __LOG_FILENAME = filename
 
-def unset_log_to_file():
+
+def unset_log_path():
     global __SAVE_TO_FILE, __LOG_FILENAME
 
     __SAVE_TO_FILE = False
